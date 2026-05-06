@@ -2,7 +2,10 @@
 
 use crate::sync::UPSafeCell;
 use crate::task::{block_current_and_run_next, current_task, wakeup_task, TaskControlBlock};
-use alloc::{collections::VecDeque, sync::Arc};
+use alloc::{
+    collections::{BTreeMap, VecDeque},
+    sync::Arc,
+};
 
 /// semaphore structure
 pub struct Semaphore {
@@ -13,6 +16,7 @@ pub struct Semaphore {
 pub struct SemaphoreInner {
     pub count: isize,
     pub wait_queue: VecDeque<Arc<TaskControlBlock>>,
+    pub allocation: BTreeMap<usize, usize>,
 }
 
 impl Semaphore {
@@ -24,6 +28,7 @@ impl Semaphore {
                 UPSafeCell::new(SemaphoreInner {
                     count: res_count as isize,
                     wait_queue: VecDeque::new(),
+                    allocation: BTreeMap::new(),
                 })
             },
         }
@@ -32,7 +37,20 @@ impl Semaphore {
     /// up operation of semaphore
     pub fn up(&self) {
         trace!("kernel: Semaphore::up");
+        let current_tid = current_task()
+            .unwrap()
+            .inner_exclusive_access()
+            .res
+            .as_ref()
+            .unwrap()
+            .tid;
         let mut inner = self.inner.exclusive_access();
+        if let Some(count) = inner.allocation.get_mut(&current_tid) {
+            *count -= 1;
+            if *count == 0 {
+                inner.allocation.remove(&current_tid);
+            }
+        }
         inner.count += 1;
         if inner.count <= 0 {
             if let Some(task) = inner.wait_queue.pop_front() {
@@ -42,14 +60,26 @@ impl Semaphore {
     }
 
     /// down operation of semaphore
-    pub fn down(&self) {
+    pub fn down(&self) -> isize {
         trace!("kernel: Semaphore::down");
+        let current_tid = current_task()
+            .unwrap()
+            .inner_exclusive_access()
+            .res
+            .as_ref()
+            .unwrap()
+            .tid;
         let mut inner = self.inner.exclusive_access();
         inner.count -= 1;
         if inner.count < 0 {
             inner.wait_queue.push_back(current_task().unwrap());
             drop(inner);
             block_current_and_run_next();
+            let mut inner = self.inner.exclusive_access();
+            *inner.allocation.entry(current_tid).or_insert(0) += 1;
+        } else {
+            *inner.allocation.entry(current_tid).or_insert(0) += 1;
         }
+        0
     }
 }

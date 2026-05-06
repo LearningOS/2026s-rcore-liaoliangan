@@ -49,6 +49,10 @@ pub struct ProcessControlBlockInner {
     pub semaphore_list: Vec<Option<Arc<Semaphore>>>,
     /// condvar list
     pub condvar_list: Vec<Option<Arc<Condvar>>>,
+    /// Scheduling priority. Larger value means a smaller stride.
+    pub priority: isize,
+    /// Whether deadlock detection is enabled in this process.
+    pub deadlock_detect: bool,
 }
 
 impl ProcessControlBlockInner {
@@ -119,6 +123,8 @@ impl ProcessControlBlock {
                     mutex_list: Vec::new(),
                     semaphore_list: Vec::new(),
                     condvar_list: Vec::new(),
+                    priority: 16,
+                    deadlock_detect: false,
                 })
             },
         });
@@ -245,6 +251,8 @@ impl ProcessControlBlock {
                     mutex_list: Vec::new(),
                     semaphore_list: Vec::new(),
                     condvar_list: Vec::new(),
+                    priority: parent.priority,
+                    deadlock_detect: parent.deadlock_detect,
                 })
             },
         });
