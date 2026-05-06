@@ -15,6 +15,7 @@ mod switch;
 mod task;
 
 use crate::loader::{get_app_data, get_num_app};
+use crate::mm::{MapPermission, PageTableEntry, VirtAddr};
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
 use alloc::vec::Vec;
@@ -133,6 +134,45 @@ impl TaskManager {
         inner.tasks[cur].change_program_brk(size)
     }
 
+    fn record_current_syscall(&self, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let cur = inner.current_task;
+        if syscall_id < inner.tasks[cur].syscall_times.len() {
+            inner.tasks[cur].syscall_times[syscall_id] += 1;
+        }
+    }
+
+    fn current_syscall_times(&self, syscall_id: usize) -> usize {
+        let inner = self.inner.exclusive_access();
+        let cur = inner.current_task;
+        if syscall_id < inner.tasks[cur].syscall_times.len() {
+            inner.tasks[cur].syscall_times[syscall_id]
+        } else {
+            0
+        }
+    }
+
+    fn current_translate(&self, va: VirtAddr) -> Option<PageTableEntry> {
+        let inner = self.inner.exclusive_access();
+        inner.tasks[inner.current_task].memory_set.translate(va.floor())
+    }
+
+    fn mmap_current(&self, start: usize, len: usize, permission: MapPermission) -> bool {
+        let mut inner = self.inner.exclusive_access();
+        let cur = inner.current_task;
+        inner.tasks[cur]
+            .memory_set
+            .mmap(start.into(), (start + len).into(), permission)
+    }
+
+    fn munmap_current(&self, start: usize, len: usize) -> bool {
+        let mut inner = self.inner.exclusive_access();
+        let cur = inner.current_task;
+        inner.tasks[cur]
+            .memory_set
+            .munmap(start.into(), (start + len).into())
+    }
+
     /// Switch current `Running` task to the task we have found,
     /// or there is no `Ready` task and we can exit with all applications completed
     fn run_next_task(&self) {
@@ -201,4 +241,29 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 /// Change the current 'Running' task's program break
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
+}
+
+/// Record a syscall made by current task.
+pub fn record_current_syscall(syscall_id: usize) {
+    TASK_MANAGER.record_current_syscall(syscall_id);
+}
+
+/// Return syscall invocation count of current task.
+pub fn current_syscall_times(syscall_id: usize) -> usize {
+    TASK_MANAGER.current_syscall_times(syscall_id)
+}
+
+/// Translate a user virtual address of current task.
+pub fn current_translate(va: VirtAddr) -> Option<PageTableEntry> {
+    TASK_MANAGER.current_translate(va)
+}
+
+/// Map pages in current task.
+pub fn mmap_current(start: usize, len: usize, permission: MapPermission) -> bool {
+    TASK_MANAGER.mmap_current(start, len, permission)
+}
+
+/// Unmap pages in current task.
+pub fn munmap_current(start: usize, len: usize) -> bool {
+    TASK_MANAGER.munmap_current(start, len)
 }
