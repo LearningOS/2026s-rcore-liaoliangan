@@ -1,7 +1,7 @@
 //! Process management syscalls
 use crate::{
     task::{current_syscall_times, exit_current_and_run_next, suspend_current_and_run_next},
-    timer::get_time_us,
+    timer::get_time_ms,
 };
 
 #[repr(C)]
@@ -28,11 +28,11 @@ pub fn sys_yield() -> isize {
 /// get time with second and microsecond
 pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     trace!("kernel: sys_get_time");
-    let us = get_time_us();
+    let ms = get_time_ms();
     unsafe {
         *ts = TimeVal {
-            sec: us / 1_000_000,
-            usec: us % 1_000_000,
+            sec: ms / 1000,
+            usec: ms % 1000 * 1000,
         };
     }
     0
