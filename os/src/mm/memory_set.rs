@@ -266,6 +266,61 @@ impl MemorySet {
         self.page_table.translate(vpn)
     }
 
+    /// Map a new framed range if every target page is currently unmapped.
+    pub fn mmap(
+        &mut self,
+        start_va: VirtAddr,
+        end_va: VirtAddr,
+        permission: MapPermission,
+    ) -> bool {
+        let start_vpn = start_va.floor();
+        let end_vpn = end_va.ceil();
+        for vpn in VPNRange::new(start_vpn, end_vpn) {
+            if self.translate(vpn).is_some() {
+                return false;
+            }
+        }
+        self.push(
+            MapArea::new(start_va, end_va, MapType::Framed, permission),
+            None,
+        );
+        true
+    }
+
+    /// Unmap a range if every page is mapped and no area is partially cut.
+    pub fn munmap(&mut self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
+        let start_vpn = start_va.floor();
+        let end_vpn = end_va.ceil();
+        for vpn in VPNRange::new(start_vpn, end_vpn) {
+            if self.translate(vpn).is_none() {
+                return false;
+            }
+        }
+        for area in self.areas.iter() {
+            let area_start = area.vpn_range.get_start();
+            let area_end = area.vpn_range.get_end();
+            let overlaps = start_vpn < area_end && area_start < end_vpn;
+            if overlaps && !(start_vpn <= area_start && area_end <= end_vpn) {
+                return false;
+            }
+        }
+        let mut remaining = Vec::new();
+        for mut area in self.areas.drain(..) {
+            let area_start = area.vpn_range.get_start();
+            let area_end = area.vpn_range.get_end();
+            if start_vpn <= area_start && area_end <= end_vpn {
+                area.unmap(&mut self.page_table);
+            } else {
+                remaining.push(area);
+            }
+        }
+        self.areas = remaining;
+        unsafe {
+            asm!("sfence.vma");
+        }
+        true
+    }
+
     ///Remove all `MapArea`
     pub fn recycle_data_pages(&mut self) {
         self.areas.clear();
