@@ -30,7 +30,6 @@ pub fn sys_yield() -> isize {
     0
 }
 
-/// YOUR JOB: get time with second and microsecond
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
 pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
@@ -55,7 +54,6 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     0
 }
 
-/// TODO: Finish sys_trace to pass testcases
 /// HINT: You might reimplement it with virtual memory management.
 pub fn sys_trace(trace_request: usize, id: usize, data: usize) -> isize {
     trace!("kernel: sys_trace");
@@ -81,7 +79,6 @@ pub fn sys_trace(trace_request: usize, id: usize, data: usize) -> isize {
     }
 }
 
-// YOUR JOB: Implement mmap.
 pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
     trace!("kernel: sys_mmap");
     if start % PAGE_SIZE != 0 || len == 0 || port == 0 || port & !0x7 != 0 {
@@ -107,7 +104,6 @@ pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
     }
 }
 
-// YOUR JOB: Implement munmap.
 pub fn sys_munmap(start: usize, len: usize) -> isize {
     trace!("kernel: sys_munmap");
     if start % PAGE_SIZE != 0 || len == 0 {
