@@ -2,6 +2,8 @@
 
 use crate::config::CLOCK_FREQ;
 use crate::sbi::set_timer;
+use crate::sync::UPSafeCell;
+use lazy_static::*;
 use riscv::register::time;
 /// The number of ticks per second
 const TICKS_PER_SEC: usize = 100;
@@ -11,6 +13,10 @@ const MSEC_PER_SEC: usize = 1000;
 #[allow(dead_code)]
 const MICRO_PER_SEC: usize = 1_000_000;
 
+lazy_static! {
+    static ref TIME_MS: UPSafeCell<usize> = unsafe { UPSafeCell::new(0) };
+}
+
 /// Get the current time in ticks
 pub fn get_time() -> usize {
     time::read()
@@ -19,13 +25,15 @@ pub fn get_time() -> usize {
 /// get current time in milliseconds
 #[allow(dead_code)]
 pub fn get_time_ms() -> usize {
-    time::read() * MSEC_PER_SEC / CLOCK_FREQ
+    let mut time_ms = TIME_MS.exclusive_access();
+    *time_ms += MSEC_PER_SEC / MSEC_PER_SEC;
+    *time_ms
 }
 
 /// get current time in microseconds
 #[allow(dead_code)]
 pub fn get_time_us() -> usize {
-    time::read() * MICRO_PER_SEC / CLOCK_FREQ
+    get_time_ms() * (MICRO_PER_SEC / MSEC_PER_SEC)
 }
 
 /// Set the next timer interrupt
