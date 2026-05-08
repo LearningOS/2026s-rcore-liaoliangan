@@ -1,6 +1,9 @@
 name: Jobs
 
-on: [push]
+on:
+  push:
+    branches:
+      - 'ch*'
 
 env:
   CARGO_TERM_COLOR: always
@@ -22,7 +25,11 @@ jobs:
           git config --global --add safe.directory /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}
           git clone https://github.com/LearningOS/rCore-Tutorial-Checker.git ci-user
           git clone https://github.com/LearningOS/rCore-Tutorial-Test.git ci-user/user
-          ID=`git rev-parse --abbrev-ref HEAD | grep -oP 'ch\K[0-9]'`
+          ID=`git rev-parse --abbrev-ref HEAD | grep -oP '^ch\K[0-9]+'`
+          if [ -z "$ID" ]; then
+            echo "Current branch is not a chapter branch"
+            exit 1
+          fi
           cd ci-user && make test CHAPTER=$ID passwd=${{ secrets.BASE_TEST_TOKEN }} OFFLINE=1 > ../output.txt
           cat ../output.txt
       - name: end
