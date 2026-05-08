@@ -35,8 +35,9 @@ jobs:
       - name: end
         id: end
         run: |
-          cat output.txt | grep "Test passed" | grep -oP "\d{1,}/\d{1,}" | xargs -i echo "points={}"
-          cat output.txt | grep "Test passed" | grep -oP "\d{1,}/\d{1,}" | xargs -i echo "points={}" >> $GITHUB_OUTPUT
+          POINTS=$(grep -a "Test passed" output.txt | grep -aoP "[0-9]+/[0-9]+" | tail -n 1 || true)
+          echo "points=$POINTS"
+          echo "points=$POINTS" >> $GITHUB_OUTPUT
       - name: Require full points
         run: |
           POINTS='${{ steps.end.outputs.points }}'
